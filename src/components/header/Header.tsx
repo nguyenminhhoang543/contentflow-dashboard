@@ -1,8 +1,10 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
 
 // Map of page titles from URL path
 const pageTitles: Record<string, string> = {
@@ -20,16 +22,39 @@ const pageTitles: Record<string, string> = {
   "/dashboard/notifications":      "Notifications",
 };
 
-export function Header() {
+export function Header({ setMobileMenuOpen }: { setMobileMenuOpen: (o: boolean) => void }) {
   const pathname = usePathname();
   const title = pageTitles[pathname] ?? "Dashboard";
 
+  const supabase = createClient();
+  const [avatarStr, setAvatarStr] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from("profiles").select("avatar_url").eq("id", user.id).single();
+        if (data && data.avatar_url) {
+          setAvatarStr(data.avatar_url);
+        }
+      }
+    }
+    loadUser();
+  }, [supabase]);
+
   return (
-    <header className="h-16 border-b border-border-subtle bg-background flex items-center justify-between px-6 shrink-0">
-      {/* Left side – page title + search */}
-      <div className="flex items-center gap-6 flex-1">
+    <header className="h-16 border-b border-border-subtle bg-background flex items-center justify-between px-4 md:px-6 shrink-0">
+      {/* Left side – mobile menu button + page title + search */}
+      <div className="flex items-center gap-4 flex-1">
+        <button 
+          onClick={() => setMobileMenuOpen(true)}
+          className="md:hidden p-2 -ml-2 text-foreground hover:bg-elevated rounded-md transition-colors"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
         <span className="text-sm font-semibold text-foreground hidden sm:block whitespace-nowrap">{title}</span>
-        <div className="relative w-56 xl:w-72">
+        <div className="relative w-full max-w-xs md:w-56 xl:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted" />
           <input
             type="text"
@@ -48,13 +73,12 @@ export function Header() {
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent-red rounded-full border border-background" />
         </Link>
-        <div className="h-8 w-px bg-border-subtle" />
-        <button
-          onClick={() => alert("Export Report as CSV coming soon.")}
-          className="flex items-center gap-2 bg-accent-amber hover:bg-accent-amber-light text-background font-medium text-sm px-4 py-2 rounded-md transition-colors"
-        >
-          Export Report
-        </button>
+
+        {avatarStr && (
+          <div className="hidden md:block pl-2 border-l border-border-subtle">
+            <img src={avatarStr} alt="Avatar" className="w-8 h-8 rounded-full border border-border-subtle object-cover" />
+          </div>
+        )}
       </div>
     </header>
   );
