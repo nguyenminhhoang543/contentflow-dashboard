@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
@@ -12,13 +12,26 @@ export default function NewOrderPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const supabase = createClient();
 
+  const [contentTypes, setContentTypes] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    type: "Blog Post",
+    type: "",
+    typeId: "",
     title: "",
     words: 1000,
     instructions: "",
     deadline: "",
   });
+
+  useEffect(() => {
+    async function loadCatalog() {
+      const { data } = await supabase.from("content_catalog").select("*").order("name");
+      if (data && data.length > 0) {
+        setContentTypes(data);
+        setFormData(prev => ({ ...prev, type: data[0].name, typeId: data[0].id }));
+      }
+    }
+    loadCatalog();
+  }, [supabase]);
 
   const nextStep = () => {
     if (step < 3) setStep(step + 1);
@@ -96,14 +109,18 @@ export default function NewOrderPage() {
               <div>
                 <label className="block text-sm font-medium text-foreground-muted mb-1">Content Type</label>
                 <select 
-                  value={formData.type}
-                  onChange={e => setFormData({...formData, type: e.target.value})}
+                  value={formData.typeId}
+                  onChange={e => {
+                    const selected = contentTypes.find(c => c.id === e.target.value);
+                    if (selected) {
+                      setFormData({...formData, typeId: selected.id, type: selected.name});
+                    }
+                  }}
                   className="w-full bg-elevated border border-border-subtle text-sm rounded-md py-2 px-3 text-foreground focus:outline-none focus:border-accent-amber"
                 >
-                  <option>Blog Post</option>
-                  <option>Article</option>
-                  <option>Landing Page Copy</option>
-                  <option>Press Release</option>
+                  {contentTypes.length === 0 ? <option>Loading...</option> : 
+                   contentTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                  }
                 </select>
               </div>
               <div>
@@ -170,7 +187,7 @@ export default function NewOrderPage() {
                 <div><dt className="text-foreground-muted">Type:</dt><dd className="font-medium text-foreground">{formData.type}</dd></div>
                 <div><dt className="text-foreground-muted">Words:</dt><dd className="font-medium text-foreground">{formData.words}</dd></div>
                 <div><dt className="text-foreground-muted">Deadline:</dt><dd className="font-medium text-foreground">{formData.deadline || "Standard timeframe"}</dd></div>
-                <div><dt className="text-foreground-muted">Estimated Price:</dt><dd className="font-medium text-accent-green">${(formData.words * 0.08).toFixed(2)}</dd></div>
+                <div><dt className="text-foreground-muted">Estimated Price:</dt><dd className="font-medium text-accent-green">${((contentTypes.find(c => c.id === formData.typeId)?.price_per_word || 0.08) * formData.words).toFixed(2)}</dd></div>
               </dl>
             </div>
             {formData.instructions && (

@@ -1,23 +1,44 @@
 "use client";
 
-import { useState } from "react";
-import { Calculator, DollarSign, Clock } from "lucide-react";
-
-const contentTypes = [
-  { name: "Blog Post",          pricePerWord: 0.08, turnaround: "2-3 days" },
-  { name: "Website Copy",       pricePerWord: 0.12, turnaround: "3-5 days" },
-  { name: "Email Sequence",     pricePerWord: 0.10, turnaround: "2 days"   },
-  { name: "Product Description",pricePerWord: 0.06, turnaround: "24 hours" },
-  { name: "Press Release",      pricePerWord: 0.14, turnaround: "1-2 days" },
-  { name: "Social Media Batch", pricePerWord: 0.15, turnaround: "1 day"    },
-];
+import { useEffect, useState } from "react";
+import { Calculator, DollarSign, Clock, Loader2 } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
 
 export default function CalculatorPage() {
-  const [contentType, setContentType] = useState(contentTypes[0]);
+  const [contentTypes, setContentTypes] = useState<any[]>([]);
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
   const [wordCount, setWordCount] = useState(1000);
   const [quantity, setQuantity] = useState(1);
+  const [loading, setLoading] = useState(true);
 
-  const unitPrice  = contentType.pricePerWord * wordCount;
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function fetchCatalog() {
+      const { data } = await supabase.from("content_catalog").select("*").order("name");
+      if (data && data.length > 0) {
+        setContentTypes(data);
+        setSelectedTypeId(data[0].id);
+      }
+      setLoading(false);
+    }
+    fetchCatalog();
+  }, [supabase]);
+
+  if (loading) {
+     return (
+      <div className="flex justify-center items-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-accent-cyan" />
+      </div>
+    );
+  }
+
+  if (contentTypes.length === 0) {
+    return <div className="text-center mt-20 text-foreground-muted">Missing content catalog. Run FINAL_SCHEMA_PHASE2.sql.</div>;
+  }
+
+  const selectedType = contentTypes.find(c => c.id === selectedTypeId) || contentTypes[0];
+  const unitPrice  = Number(selectedType.price_per_word) * wordCount;
   const totalPrice = unitPrice * quantity;
 
   return (
@@ -38,11 +59,11 @@ export default function CalculatorPage() {
           <div>
             <label className="block text-sm font-medium text-foreground-muted mb-1">Content Type</label>
             <select
-              value={contentType.name}
-              onChange={e => setContentType(contentTypes.find(c => c.name === e.target.value)!)}
+              value={selectedTypeId}
+              onChange={e => setSelectedTypeId(e.target.value)}
               className="w-full bg-elevated border border-border-subtle text-sm rounded-md py-2 px-3 text-foreground focus:outline-none focus:border-accent-amber"
             >
-              {contentTypes.map(c => <option key={c.name}>{c.name}</option>)}
+              {contentTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
 
@@ -91,11 +112,11 @@ export default function CalculatorPage() {
             <div className="space-y-3 text-sm mb-6">
               <div className="flex justify-between">
                 <span className="text-foreground-muted">Content Type</span>
-                <span className="text-foreground font-medium">{contentType.name}</span>
+                <span className="text-foreground font-medium">{selectedType.name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-foreground-muted">Rate</span>
-                <span className="text-foreground font-medium">${contentType.pricePerWord.toFixed(2)} / word</span>
+                <span className="text-foreground font-medium">${Number(selectedType.price_per_word).toFixed(2)} / word</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-foreground-muted">Word Count</span>
@@ -123,7 +144,7 @@ export default function CalculatorPage() {
 
             <div className="flex items-center gap-2 text-xs text-foreground-muted mb-5">
               <Clock className="w-4 h-4 text-accent-cyan" />
-              Estimated turnaround: <span className="text-accent-cyan font-medium">{contentType.turnaround}</span>
+              Estimated turnaround: <span className="text-accent-cyan font-medium">{selectedType.turnaround_time}</span>
             </div>
 
             <a href="/dashboard/orders/new"
